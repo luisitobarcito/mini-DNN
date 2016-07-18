@@ -165,26 +165,29 @@ class Net(object):
 class NetTrainer(object):
     "docstring"
 
-    max_iter = 0
-    solver_func = None
-    loss = None
-    lossPrime = None
     net = None
-    print_interval = 100
     batch_size = None
+    max_iter = 1000
+    solver_func = None
+    loss_func = None
+    print_interval = None
+    train_data = None
+    label_data = None
 
-    def __init__(self, net=None, loss_func='mse', batch_size=None, max_iter=1000, train_data=None, label_data=None, solver=None, print_interval=None):
-        self.net = net
-        self.batch_size = batch_size
-        self.solver_func = solver.solverFunc()
-        self.loss = loss_list[loss_func][0]
-        self.lossPrime = loss_list[loss_func][1]
-        self.max_iter = max_iter
-        self.data = Data(train_data, batch_size=self.batch_size)
-        self.labels = Data(label_data)
-        if print_interval is not None:
-            self.print_interval = print_interval
-        
+    def __init__(self, params):
+        for prm_name in params.keys():
+            setattr(self, prm_name, params[prm_name])
+
+        assert self.net is not None, "Net object cannot be None"
+        assert self.loss_func is not None, "No loss was specified"
+        self.loss = loss_list[self.loss_func][0]
+        self.lossPrime = loss_list[self.loss_func][1]
+        assert self.train_data is not None, "Training data must be specified"
+        self.data = Data(self.train_data, batch_size=self.batch_size)
+        assert self.label_data is not None, "Labels must be specified"        
+        self.labels = Data(self.label_data)
+        self.solver_func = self.solver.solverFunc()
+  
     def train(self, n_iter=None):
         for iTr in range(self.max_iter):
             Xin = self.data.getBatch()
