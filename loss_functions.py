@@ -1,6 +1,10 @@
+"""
+Some commonly employed losses for neural net training
+"""
+
 import numpy as np
 
-# Cross- entropy for binomial
+# Cross- entropy for binomial distributions
 def myXent(T, Y):
     return -(np.multiply(T, np.log(Y)) + np.multiply(1 - T, np.log(1 - Y)))
 
@@ -21,7 +25,7 @@ def myHinge(T, Y):
 def myHingePrime(T, Y):
     return np.multiply((np.multiply(Y, T) < 1.0).astype(Y), -T)
 
-
+## Losses are registered in the following dictionary
 loss_list = {'xent':(myXent, myXentPrime),     \
              'mse':(myMeanSquaredError, myMeanSquaredErrorPrime), \
              'hinge': (myHinge, myHingePrime)}

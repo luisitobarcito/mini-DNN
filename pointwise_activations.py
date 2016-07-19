@@ -1,5 +1,5 @@
 """
-wrapper for activation functions and their derivatives
+Wrapper for activation functions and their derivatives
 to be used with the DNN classes
 """
 
@@ -49,7 +49,7 @@ def myHalfSquare(X):
 def myHalfSquarePrime(X):
     return myRelu(X)
 
-
+## activation functions are regitered in the following dictionary
 func_list = {'sigmoid':(myLogistic, myLogisticPrime),     \
              'tanh':(myTanh, myTanhPrime),        \
              'relu':(myRelu, myReluPrime),        \

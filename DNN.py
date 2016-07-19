@@ -11,9 +11,16 @@ from loss_functions import loss_list
 
 class Data(object):
     """
-    Data class is a manaer class that takes care of the minibatch management
+    Data class takes care of the minibatch management
+
+    There are two optional parameters for Data objects.
+    -- batch_size: if lefts as None will use the entire data set for 
+       each pass.
+    -- shuffle: wich defaults to true will shuffle data points to feed 
+       the network at each iteration. When a epoch has been reached, 
+       data is reshuffled.
     """
-    batch_iter = None # batch iterator
+    batch_iter = None 
     data_size = None
     batch_idx = None
     crt_idx = None
@@ -41,7 +48,7 @@ class Data(object):
             return self.data
   
         if self.batch_iter == 0:
-            ## shuffle data every epoch
+            ## shuffle data at the begining of every epoch
             if self.shuffle is True:
                 self.batch_idx = np.random.permutation(self.data_size) 
             else:
@@ -55,6 +62,10 @@ class Data(object):
         return batch
 
     def getDataAsIn(self, ref_data_object=None):
+        """
+        This is an auxiliary method with the purpose of selecting
+        the corresponding data-target pairs. 
+        """
         if ref_data_object.crt_idx is not None:
             return self.data[ref_data_object.crt_idx, ::]
         else:
@@ -64,13 +75,18 @@ class Data(object):
 class Layer(object):
     """
     Layer class implements a uniform composition of affine map followed by 
-    point-wise nonlinearity
+    point-wise nonlinearity.
+    
     Input: 
     -- n_in: number of inputs
     -- n_out: number of outputs (numer of units)
-    -- activation: point-wise nonlinearity. logistic, tanh, ReLU, abs, 
-       square, halfsquare
-    -- bias: use bias (default True)
+    -- activation: point-wise nonlinearity. 
+       --logistic, 
+       --tanh, 
+       --relu, 
+       --abs,
+       --square, 
+       --halfsquare
     """
 
     X0 = None
@@ -116,7 +132,13 @@ class Layer(object):
         self.b += self.Delta_b
 
 class Net(object):
-    "docstring"
+    """
+    Net is a container for all the Layer objects that form a network
+
+    It manages the forward,backward passes through the networks as well
+    as the parametr update calls. Note that Net objects are independent of
+    the cost function employed for their training
+    """
     
     n_layer = 0
     layers = []
@@ -163,7 +185,21 @@ class Net(object):
 
 
 class NetTrainer(object):
-    "docstring"
+    """
+    NetTrainer iterates over data batches to update Net paramaters that
+    minimize a give cost.
+
+    The following are the most important elements are necessary to 
+    instantiate a NetTrainer object:
+    -- net: Net object to be trained
+    -- train_data: given in the form a numpy array with first dimension is the
+       number of data exemplars.
+    -- label_data: given in asimilar form to train_data. number of exemplars 
+       must be consistent with train_data
+    -- solver: Solver object that specifies the update rule
+    -- loss_func: These function must be chosen from loss_list which is defined        in 'loss_functions.py'
+    Training parameters are given in the form of a dictionary
+    """
 
     net = None
     batch_size = None
@@ -200,7 +236,10 @@ class NetTrainer(object):
                 print "Iteration %d, objective = %f" % (iTr,objective)
 
 class Solver(object):
-    "docstring"
+    """
+    Solver object contains the method employed to update the network
+    parameters based on the gradient information.
+    """
 
     lr_rate = None
     rate_decay = None
