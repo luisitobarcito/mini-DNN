@@ -9,7 +9,7 @@ def myXent(T, Y):
     return -(np.multiply(T, np.log(Y)) + np.multiply(1 - T, np.log(1 - Y)))
 
 def myXentPrime(T, Y):
-    return (Y - T)
+    return (Y - T) / (np.multiply(Y, 1 - Y))
 
 # Mean Squared Error
 def myMeanSquaredError(T, Y):
