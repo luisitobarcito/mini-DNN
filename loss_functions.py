@@ -8,6 +8,8 @@ import numpy as np
 def myXent(T, Y):
     return -(np.multiply(T, np.log(Y)) + np.multiply(1 - T, np.log(1 - Y)))
 
+# this function is implemented for illustrative purposes, not recommended
+# logistic-xent is a better approach in this case
 def myXentPrime(T, Y):
     return (Y - T) / (np.multiply(Y, 1 - Y))
 
