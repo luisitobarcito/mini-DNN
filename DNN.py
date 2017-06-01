@@ -96,6 +96,8 @@ class Layer(object):
     D1 = None
     W = None
     b = None
+    W_aux = None
+    b_aux = None
     Delta_W = None
     Delta_b = None
     g = None
@@ -115,17 +117,23 @@ class Layer(object):
         self.g_prime = func_list[activation][1]
     
         
-    def forward(self):
-        self.Z = np.dot(self.X0, self.W) + self.b
+    def forward(self, aux=False):
+        if aux is False:
+            self.Z = np.dot(self.X0, self.W) + self.b
+        else:
+            self.Z = np.dot(self.X0, self.W_aux) + self.b_aux
         self.X1 = self.g(self.Z)
     
-    def backward(self):
+    def backward(self, aux=False):
         if self.D1 is None:
             self.G = self.g_prime(self.Z)
         else:
             self.G = np.multiply(self.D1, self.g_prime(self.Z))
-        self.D0 = np.dot(self.G, self.W.transpose())
-
+        if aux is False:
+            self.D0 = np.dot(self.G, self.W.transpose())
+        else:
+            self.D0 = np.dot(self.G, self.W_aux.transpose())
+            
     def updateParam(self, solver_func):
         self.Delta_W, self.Delta_b = solver_func(self)
         self.W += self.Delta_W
@@ -161,19 +169,19 @@ class Net(object):
         self.layers += [Layer(n_in, n_out, activation)]
         self.n_layer += 1
  
-    def forward(self, X):
+    def forward(self, X, aux=False):
         X0 = X
         for layer in self.layers:
             layer.X0 = X0
-            layer.forward()
+            layer.forward(aux=aux)
             X0 = layer.X1
         self.Xout = X0
         
-    def backward(self, DeltaN):
+    def backward(self, DeltaN, aux=False):
         Delta1 = DeltaN
         for layer in self.layers[-1::-1]:
             layer.D1 = Delta1
-            layer.backward()
+            layer.backward(aux=aux)
             Delta1 = layer.D0
 
     def updateParam(self, solver_func=None):
@@ -222,16 +230,13 @@ class NetTrainer(object):
         self.data = Data(self.train_data, batch_size=self.batch_size)
         assert self.label_data is not None, "Labels must be specified"        
         self.labels = Data(self.label_data)
-        self.solver_func = self.solver.solverFunc()
+        self.solver_func = self.solver.solver_func
   
     def train(self, n_iter=None):
         for iTr in range(self.max_iter):
             Xin = self.data.getBatch()
             T = self.labels.getDataAsIn(self.data)
-            self.net.forward(Xin)
-            objective = np.mean(self.loss(T, self.net.Xout), axis=0)
-            self.net.backward(self.lossPrime(T, self.net.Xout) / T.shape[0])
-            self.net.updateParam(self.solver_func)
+            objective = self.solver.step(self.net, Xin, T, self.loss_func)
             if iTr % self.print_interval == 0:
                 print "Iteration %d, objective = %f" % (iTr,objective)
 
@@ -240,22 +245,72 @@ class Solver(object):
     Solver object contains the method employed to update the network
     parameters based on the gradient information.
     """
-
     lr_rate = None
     rate_decay = None
-    momentum = None
-    solver = None
     
     def __init__(self, params):
         for prm_name in params.keys():
             setattr(self, prm_name, params[prm_name])
 
     def solverFunc(self):
-        return getattr(self, self.solver)
+        pass
 
-    def sgd(self, layer):
+    def step(self, net, Xin, loss_func):
+        pass        
+
+class SGDSolver(Solver):
+
+    momentum = None
+    def __init__(self, params):
+        for prm_name in params.keys():
+            setattr(self, prm_name, params[prm_name])
+
+    def step(self, net, Xin, T, loss_func):
+        loss = loss_list[loss_func][0]
+        lossPrime = loss_list[loss_func][1]
+        net.forward(Xin)
+        objective = np.mean(loss(T, net.Xout), axis=0)
+        net.backward(lossPrime(T, net.Xout) / T.shape[0])
+        net.updateParam(self.solver_func)
+        return objective
+        
+    def solver_func(self, layer):
         Delta_W = self.momentum * layer.Delta_W - self.lr_rate * np.dot(layer.X0.transpose(), layer.G) 
         Delta_b = self.momentum * layer.Delta_b - self.lr_rate * np.sum(layer.G, axis=0)
         return Delta_W, Delta_b
 
+
+class NAGSolver(Solver):
+    """ Nesterov Accelerated gradient 
+    """
+    momentum = None
+    def __init__(self, params):
+        for prm_name in params.keys():
+            setattr(self, prm_name, params[prm_name])
+
+    def setAux(self, net):
+        for layer in net.layers:
+            layer.W_aux = layer.W + self.momentum * layer.Delta_W
+            layer.b_aux = layer.b + self.momentum * layer.Delta_b
+            
+    def step(self, net, Xin, T, loss_func):
+        loss = loss_list[loss_func][0]
+        lossPrime = loss_list[loss_func][1]
+        net.forward(Xin)        
+        objective = np.mean(loss(T, net.Xout), axis=0)
+        self.setAux(net)
+        net.forward(Xin, aux=True)
+        net.backward(lossPrime(T, net.Xout) / T.shape[0], aux=True)
+        net.updateParam(self.solver_func)
+        return objective
+        
+    def solver_func(self, layer):
+        Delta_W = self.momentum * layer.Delta_W - self.lr_rate * np.dot(layer.X0.transpose(), layer.G) 
+        Delta_b = self.momentum * layer.Delta_b - self.lr_rate * np.sum(layer.G, axis=0)
+        return Delta_W, Delta_b
+
+    #    def nesterov(self, layer):
+#        Delta_W = self.momentum * layer.Delta_W - self.lr_rate * np.dot(layer.X0.transpose(), layer.G) 
+#        Delta_b = self.momentum * layer.Delta_b - self.lr_rate * np.sum(layer.G, axis=0)
+#        return Delta_W, Delta_b
 
