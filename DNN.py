@@ -101,6 +101,8 @@ class Layer(object):
     b_aux = None
     Delta_W = None
     Delta_b = None
+    Grad_W = None
+    Grad_b = None
     g = None
     g_prime = None
     n_in = None
@@ -114,8 +116,10 @@ class Layer(object):
         self.b = np.zeros((1, self.n_out))
         self.W_aux = np.zeros_like(self.W) 
         self.b_aux = np.zeros_like(self.b)
-        self.Delta_W = np.zeros((self.n_in, self.n_out))
-        self.Delta_b = np.zeros((1, self.n_out))
+        self.Delta_W = np.zeros_like(self.W) 
+        self.Delta_b = np.zeros_like(self.b)
+        self.Grad_W = np.zeros((self.n_in, self.n_out))
+        self.Grad_b = np.zeros((1, self.n_out))
         self.g = func_list[activation][0]
         self.g_prime = func_list[activation][1]
     
@@ -136,6 +140,8 @@ class Layer(object):
             self.D0 = np.dot(self.G, self.W.transpose())
         else:
             self.D0 = np.dot(self.G, self.W_aux.transpose())
+        self.Grad_W = np.dot(self.X0.transpose(), self.G)
+        self.Grad_b = np.sum(self.G, axis=0)
             
     def updateParam(self, solver_func):
         self.Delta_W, self.Delta_b = solver_func(self)

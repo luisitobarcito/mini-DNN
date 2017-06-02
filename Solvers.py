@@ -37,7 +37,7 @@ class SGDSolver(Solver):
     def __init__(self, params):
         for prm_name in params.keys():
             setattr(self, prm_name, params[prm_name])
-
+            
     def step(self, net, Xin, T, loss_func):
         loss = loss_list[loss_func][0]
         lossPrime = loss_list[loss_func][1]
@@ -48,8 +48,8 @@ class SGDSolver(Solver):
         return objective
         
     def solver_func(self, layer):
-        Delta_W = self.momentum * layer.Delta_W - self.lr_rate * np.dot(layer.X0.transpose(), layer.G) 
-        Delta_b = self.momentum * layer.Delta_b - self.lr_rate * np.sum(layer.G, axis=0)
+        Delta_W = self.momentum * layer.Delta_W - self.lr_rate * layer.Grad_W
+        Delta_b = self.momentum * layer.Delta_b - self.lr_rate * layer.Grad_b
         return Delta_W, Delta_b
 
 
@@ -78,8 +78,8 @@ class NAGSolver(Solver):
         return objective
         
     def solver_func(self, layer):
-        Delta_W = self.momentum * layer.Delta_W - self.lr_rate * np.dot(layer.X0.transpose(), layer.G) 
-        Delta_b = self.momentum * layer.Delta_b - self.lr_rate * np.sum(layer.G, axis=0)
+        Delta_W = self.momentum * layer.Delta_W - self.lr_rate * layer.Grad_W 
+        Delta_b = self.momentum * layer.Delta_b - self.lr_rate * layer.Grad_b
         return Delta_W, Delta_b
 
 class RMSPropSolver(Solver):
@@ -109,10 +109,10 @@ class RMSPropSolver(Solver):
         return objective
         
     def solver_func(self, layer):
-        layer.W_aux = self.rms_forget * layer.W_aux + (1 - self.rms_forget) * (np.dot(layer.X0.transpose(), layer.G)**2) 
-        layer.b_aux = self.rms_forget * layer.b_aux + (1 - self.rms_forget) * (np.sum(layer.G, axis=0)**2)
-        Delta_W =  - self.lr_rate * np.dot(layer.X0.transpose(), layer.G) / np.sqrt(layer.W_aux) 
-        Delta_b =  - self.lr_rate * np.sum(layer.G, axis=0) / np.sqrt(layer.b_aux)
+        layer.W_aux = self.rms_forget * layer.W_aux + (1 - self.rms_forget) * (layer.Grad_W**2) 
+        layer.b_aux = self.rms_forget * layer.b_aux + (1 - self.rms_forget) * (layer.Grad_b**2)
+        Delta_W =  - self.lr_rate * layer.Grad_W / np.sqrt(layer.W_aux) 
+        Delta_b =  - self.lr_rate * layer.Grad_b / np.sqrt(layer.b_aux)
         return Delta_W, Delta_b
 
 class AdaGradSolver(Solver):
@@ -139,10 +139,10 @@ class AdaGradSolver(Solver):
         return objective
         
     def solver_func(self, layer):
-        layer.W_aux = layer.W_aux + (np.dot(layer.X0.transpose(), layer.G)**2) 
-        layer.b_aux = layer.b_aux + (np.sum(layer.G, axis=0)**2)
-        Delta_W =  - self.lr_rate * np.dot(layer.X0.transpose(), layer.G) / np.sqrt(layer.W_aux) 
-        Delta_b =  - self.lr_rate * np.sum(layer.G, axis=0) / np.sqrt(layer.b_aux)
+        layer.W_aux = layer.W_aux + (layer.Grad_W**2) 
+        layer.b_aux = layer.b_aux + (layer.Grad_b**2)
+        Delta_W =  - self.lr_rate * layer.Grad_W / np.sqrt(layer.W_aux) 
+        Delta_b =  - self.lr_rate * layer.Grad_b / np.sqrt(layer.b_aux)
         return Delta_W, Delta_b
 
 
@@ -178,8 +178,8 @@ class AdaDeltaSolver(Solver):
     def updateAux(self, net):
         layer_count = 0
         for layer in net.layers:
-            self.G_W_aux[layer_count] = self.rms_forget * self.G_W_aux[layer_count] + (1 - self.rms_forget) * (np.dot(layer.X0.transpose(), layer.G)**2)
-            self.G_b_aux[layer_count] = self.rms_forget * self.G_b_aux[layer_count] + (1 - self.rms_forget) * (np.sum(layer.G, axis=0)**2) 
+            self.G_W_aux[layer_count] = self.rms_forget * self.G_W_aux[layer_count] + (1 - self.rms_forget) * (layer.Grad_W**2)
+            self.G_b_aux[layer_count] = self.rms_forget * self.G_b_aux[layer_count] + (1 - self.rms_forget) * (layer.Grad_b**2) 
             self.Delta_W_aux[layer_count] = self.rms_forget * self.Delta_W_aux[layer_count] + (1 - self.rms_forget) * (layer.Delta_W**2) 
             self.Delta_b_aux[layer_count] = self.rms_forget * self.Delta_b_aux[layer_count] + (1 - self.rms_forget) * (layer.Delta_b**2)
             layer.W_aux = np.sqrt(self.Delta_W_aux[layer_count] + self.ada_eps) / np.sqrt(self.G_W_aux[layer_count] + self.ada_eps)
@@ -198,6 +198,6 @@ class AdaDeltaSolver(Solver):
         return objective
         
     def solver_func(self, layer):
-        Delta_W =  -np.dot(layer.X0.transpose(), layer.G) * layer.W_aux 
-        Delta_b =  -np.sum(layer.G, axis=0) * layer.b_aux
+        Delta_W =  -layer.Grad_W * layer.W_aux 
+        Delta_b =  -layer.Grad_b * layer.b_aux
         return Delta_W, Delta_b
