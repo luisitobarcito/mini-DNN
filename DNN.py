@@ -156,8 +156,8 @@ class Net(object):
     the cost function employed for their training
     """
     
-    n_layer = 0
-    layers = []
+    n_layer = None
+    layers = None
     Xout = None
     n_in = None
     n_out = None
