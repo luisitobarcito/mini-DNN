@@ -175,8 +175,8 @@ class AdaDeltaSolver(Solver):
         for layer in net.layers:
             for paramname in layer.params.keys():
                 self.grads_aux[layer_count][paramname] = self.rms_forget * self.grads_aux[layer_count][paramname] + (1 - self.rms_forget) * (layer.grads[paramname]**2)
-                self.deltas_aux[layer_count][paramname] = self.rms_forget * self.deltas_aux[layer_count][parmaname] + (1 - self.rms_forget) * (layer.deltas[paramname]**2) 
-                layer.params[paramname] = np.sqrt(self.deltas_aux[layer_count][paramname] + self.ada_eps) / np.sqrt(self.grads_aux[layer_count][paramname] + self.ada_eps)
+                self.deltas_aux[layer_count][paramname] = self.rms_forget * self.deltas_aux[layer_count][paramname] + (1 - self.rms_forget) * (layer.deltas[paramname]**2) 
+                layer.params_aux[paramname] = np.sqrt(self.deltas_aux[layer_count][paramname] + self.ada_eps) / np.sqrt(self.grads_aux[layer_count][paramname] + self.ada_eps)
             layer_count += 1
 
             
