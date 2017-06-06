@@ -71,8 +71,9 @@ class Data(object):
             return self.data[ref_data_object.crt_idx, ::]
         else:
             return self.data
-    
 
+    
+        
 class Layer(object):
     """
     Layer class implements a uniform composition of affine map followed by 
@@ -95,14 +96,10 @@ class Layer(object):
     Z = None
     D0 = None
     D1 = None
-    W = None
-    b = None
-    W_aux = None
-    b_aux = None
-    Delta_W = None
-    Delta_b = None
-    Grad_W = None
-    Grad_b = None
+    params = None
+    params_aux = None
+    deltas = None
+    grads = None
     g = None
     g_prime = None
     n_in = None
@@ -112,23 +109,25 @@ class Layer(object):
         assert n_in is not None and n_out is not None, "layer must hav valid inout output sizes"
         self.n_in = n_in
         self.n_out = n_out
-        self.W = np.random.normal(size=(self.n_in, self.n_out)) / np.sqrt(self.n_in)
-        self.b = np.zeros((1, self.n_out))
-        self.W_aux = np.zeros_like(self.W) 
-        self.b_aux = np.zeros_like(self.b)
-        self.Delta_W = np.zeros_like(self.W) 
-        self.Delta_b = np.zeros_like(self.b)
-        self.Grad_W = np.zeros((self.n_in, self.n_out))
-        self.Grad_b = np.zeros((1, self.n_out))
+        self.params = {}
+        self.params_aux = {}
+        self.deltas = {}
+        self.grads = {}
+        self.params['W'] = np.random.normal(size=(self.n_in, self.n_out)) / np.sqrt(self.n_in)
+        self.params['b'] = np.zeros((1, self.n_out))
+        for paramname in self.params.keys():
+            self.params_aux[paramname] = np.zeros_like(self.params[paramname]) 
+            self.deltas[paramname] = np.zeros_like(self.params[paramname]) 
+            self.grads[paramname] = np.zeros_like(self.params[paramname])
         self.g = func_list[activation][0]
         self.g_prime = func_list[activation][1]
     
         
     def forward(self, aux=False):
         if aux is False:
-            self.Z = np.dot(self.X0, self.W) + self.b
+            self.Z = np.dot(self.X0, self.params['W']) + self.params['b']
         else:
-            self.Z = np.dot(self.X0, self.W_aux) + self.b_aux
+            self.Z = np.dot(self.X0, self.params_aux['W']) + self.params_aux['b']
         self.X1 = self.g(self.Z)
     
     def backward(self, aux=False):
@@ -137,93 +136,17 @@ class Layer(object):
         else:
             self.G = np.multiply(self.D1, self.g_prime(self.Z))
         if aux is False:
-            self.D0 = np.dot(self.G, self.W.transpose())
+            self.D0 = np.dot(self.G, self.params['W'].transpose())
         else:
-            self.D0 = np.dot(self.G, self.W_aux.transpose())
-        self.Grad_W = np.dot(self.X0.transpose(), self.G)
-        self.Grad_b = np.sum(self.G, axis=0)
+            self.D0 = np.dot(self.G, self.params_aux['W'].transpose())
+        self.grads['W'] = np.dot(self.X0.transpose(), self.G)
+        self.grads['b'] = np.sum(self.G, axis=0)
             
     def updateParam(self, solver_func):
-        self.Delta_W, self.Delta_b = solver_func(self)
-        self.W += self.Delta_W
-        self.b += self.Delta_b
+        solver_func(self)
+        self.params['W'] += self.deltas['W']
+        self.params['b'] += self.deltas['b']
 
-class RNNLayer(Layer):
-    """
-    Layer class implements a uniform composition of affine map followed by 
-    point-wise nonlinearity.
-    
-    Input: 
-    -- n_in: number of inputs
-    -- n_out: number of outputs (numer of units)
-    -- activation: point-wise nonlinearity. 
-       --logistic, 
-       --tanh, 
-       --relu, 
-       --abs,
-       --square, 
-       --halfsquare
-    """
-
-    X0 = None
-    X1 = None
-    Z = None
-    D0 = None
-    D1 = None
-    W = None
-    b = None
-    W_aux = None
-    b_aux = None
-    Delta_W = None
-    Delta_b = None
-    Grad_W = None
-    Grad_b = None
-    g = None
-    g_prime = None
-    n_in = None
-    n_out = None
-
-    def __init__(self, n_in, n_out, activation):
-        assert n_in is not None and n_out is not None, "layer must hav valid inout output sizes"
-        self.n_in = n_in
-        self.n_out = n_out
-        self.W = np.random.normal(size=(self.n_in, self.n_out)) / np.sqrt(self.n_in)
-        self.b = np.zeros((1, self.n_out))
-        self.W_aux = np.zeros_like(self.W) 
-        self.b_aux = np.zeros_like(self.b)
-        self.Delta_W = np.zeros_like(self.W) 
-        self.Delta_b = np.zeros_like(self.b)
-        self.Grad_W = np.zeros((self.n_in, self.n_out))
-        self.Grad_b = np.zeros((1, self.n_out))
-        self.g = func_list[activation][0]
-        self.g_prime = func_list[activation][1]
-    
-        
-    def forward(self, aux=False):
-        if aux is False:
-            self.Z = np.dot(self.X0, self.W) + self.b
-        else:
-            self.Z = np.dot(self.X0, self.W_aux) + self.b_aux
-        self.X1 = self.g(self.Z)
-    
-    def backward(self, aux=False):
-        if self.D1 is None:
-            self.G = self.g_prime(self.Z)
-        else:
-            self.G = np.multiply(self.D1, self.g_prime(self.Z))
-        if aux is False:
-            self.D0 = np.dot(self.G, self.W.transpose())
-        else:
-            self.D0 = np.dot(self.G, self.W_aux.transpose())
-        self.Grad_W = np.dot(self.X0.transpose(), self.G)
-        self.Grad_b = np.sum(self.G, axis=0)
-            
-    def updateParam(self, solver_func):
-        self.Delta_W, self.Delta_b = solver_func(self)
-        self.W += self.Delta_W
-        self.b += self.Delta_b
-
-        
 class Net(object):
     """
     Net is a container for all the Layer objects that form a network
@@ -236,22 +159,17 @@ class Net(object):
     n_layer = 0
     layers = []
     Xout = None
+    n_in = None
+    n_out = None
     def __init__(self):
         self.n_layer = 0
         self.layers = []
         self.Xout = None
     
-    def addLayer(self, n_in=None, n_out=None, activation=None):
-        assert n_in is not None or self.n_layer > 0, "n_in must be specified for input layer"
-        assert n_out is not None, "n_out must be specified"
-        assert activation is not None, "activation must be specified"
- 
-        if n_in is not None and self.n_layer > 0:
-            assert n_in == self.layers[-1].n_out, "n_in does not match with previous layer number of units"
-        elif self.n_layer > 0:
-            n_in = self.layers[-1].n_out
-      
-        self.layers += [Layer(n_in, n_out, activation)]
+    def addLayer(self, new_layer): # n_in=None, n_out=None, activation=None):
+        if self.n_layer > 0:
+            assert new_layer.n_in == self.layers[-1].n_out , "New layer does not matche the current net output size"
+        self.layers += [new_layer]
         self.n_layer += 1
  
     def forward(self, X, aux=False):
@@ -290,13 +208,13 @@ class NetTrainer(object):
     -- label_data: given in asimilar form to train_data. number of exemplars 
        must be consistent with train_data
     -- solver: Solver object that specifies the update rule
-    -- loss_func: These function must be chosen from loss_list which is defined        in 'loss_functions.py'
+    -- loss_func: These function must be chosen from loss_list which is defined        in 'loss_funmctions.py'
     Training parameters are given in the form of a dictionary
     """
 
     net = None
     batch_size = None
-    max_iter = 1000
+    max_iter = None
     solver_func = None
     loss_func = None
     print_interval = None
@@ -306,6 +224,8 @@ class NetTrainer(object):
     def __init__(self, params):
         for prm_name in params.keys():
             setattr(self, prm_name, params[prm_name])
+        if self.max_iter is None:
+            self.max_iter = 1000
 
         assert self.net is not None, "Net object cannot be None"
         assert self.loss_func is not None, "No loss was specified"
