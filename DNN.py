@@ -132,9 +132,102 @@ class Layer(object):
     
     def backward(self, aux=False):
         if self.D1 is None:
-            self.G = self.g_prime(self.Z)
+            G = self.g_prime(self.Z)
         else:
-            self.G = np.multiply(self.D1, self.g_prime(self.Z))
+            G = np.multiply(self.D1, self.g_prime(self.Z))
+        if aux is False:
+            self.D0 = np.dot(G, self.params['W'].transpose())
+        else:
+            self.D0 = np.dot(G, self.params_aux['W'].transpose())
+        self.grads['W'] = np.dot(self.X0.transpose(), G)
+        self.grads['b'] = np.sum(G, axis=0)
+            
+    def updateParam(self, solver_func):
+        solver_func(self)
+        self.params['W'] += self.deltas['W']
+        self.params['b'] += self.deltas['b']
+
+class RNNLayer(object):
+    """
+    Layer class implements a uniform composition of affine map followed by 
+    point-wise nonlinearity.
+    
+    Input: 
+    -- n_in: number of inputs
+    -- n_out: number of outputs (numer of units)
+    -- activation: point-wise nonlinearity. 
+       --logistic, 
+       --tanh, 
+       --relu, 
+       --abs,
+       --square, 
+       --halfsquare
+    """
+    t_trunc = None
+    X0 = None
+    X1 = None
+    H = None
+    Z_h = None
+    Z_o = None
+    D0 = None
+    D1 = None
+    params = None
+    params_aux = None
+    deltas = None
+    grads = None
+    g_h = None
+    g_h_prime = None
+    g_o = None
+    g_o_prime = None
+    n_in = None
+    n_out = None
+    h_hid = None
+
+    def __init__(self, n_in, n_out, n_hid, hid_activation, out_activation, t_trunc=None):
+        assert n_in is not None and n_out is not None and n_hid is not None, "layer must hav valid inout output sizes"
+        self.n_in = n_in
+        self.n_out = n_out
+        self.n_hid = n_hid
+        self.params = {}
+        self.params_aux = {}
+        self.deltas = {}
+        self.grads = {}
+        self.params['W_vh'] = np.random.normal(size=(self.n_in, self.n_hid)) / np.sqrt(self.n_in)
+        self.params['b_h'] = np.zeros((1, self.n_hid))
+        self.params['W_hh'] = np.random.normal(size=(self.n_hid, self.n_hid)) / np.sqrt(self.n_hid)
+        self.params['b_o'] = np.zeros((1, self.n_out))
+        self.params['W_ho'] = np.random.normal(size=(self.n_hid, self.n_out)) / np.sqrt(self.n_hid)
+        for paramname in self.params.keys():
+            self.params_aux[paramname] = np.zeros_like(self.params[paramname]) 
+            self.deltas[paramname] = np.zeros_like(self.params[paramname]) 
+            self.grads[paramname] = np.zeros_like(self.params[paramname])
+        self.g_h = func_list[hid_activation][0]
+        self.g_h_prime = func_list[hid_activation][1]
+        self.g_o = func_list[out_activation][0]
+        self.g_o_prime = func_list[out_activation][1]
+
+        
+    def forward(self, aux=False):
+        T = self.X0.shape[0]
+        self.H = np.zeros((T+1, self.X0.shape[1], self.n_hid))
+        if aux is False:
+            for iTm in range(T):
+                self.Z_h[iTm, :, :] = np.dot(self.X0[iTm, ::], self.params['W_vh']) + np.dot(self.H[iTm, ::], self.params['W_hh']) + self.params['b_h']
+                self.H[iTm + 1, ::] = self.g_o(self.Z_h[iTm, ::])
+                self.Z_o[iTm, ::] = np.dot(self.H[iTm + 1, ::], self.params['W_ho']) + self.params['b_o']
+        else:
+            for iTm in range(T):
+                self.Z_h[iTm, :, :] = np.dot(self.X0[iTm, ::], self.params_aux['W_vh']) + np.dot(self.H[iTm, ::], self.params_aux['W_hh']) + self.params_aux['b_h']
+                self.H[iTm + 1, ::] = self.g_o(self.Z_h[iTm, ::])
+                self.Z_o[iTm, ::] = np.dot(self.H[iTm + 1, ::], self.params_aux['W_ho']) + self.params_aux['b_o']
+                
+        self.X1 = self.g(self.Z_o)
+    
+    def backward(self, aux=False):
+        if self.D1 is None:
+            G = self.g_prime(self.Z)
+        else:
+            G = np.multiply(self.D1, self.g_prime(self.Z))
         if aux is False:
             self.D0 = np.dot(self.G, self.params['W'].transpose())
         else:
@@ -146,6 +239,8 @@ class Layer(object):
         solver_func(self)
         self.params['W'] += self.deltas['W']
         self.params['b'] += self.deltas['b']
+
+
 
 class Net(object):
     """
