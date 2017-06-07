@@ -183,6 +183,7 @@ class RNNLayer(object):
     n_in = None
     n_out = None
     h_hid = None
+    keep_hid = None
 
     def __init__(self, n_in, n_out, n_hid, hid_activation, out_activation, t_trunc=None):
         assert n_in is not None and n_out is not None and n_hid is not None, "layer must hav valid inout output sizes"
@@ -206,11 +207,19 @@ class RNNLayer(object):
         self.g_h_prime = func_list[hid_activation][1]
         self.g_o = func_list[out_activation][0]
         self.g_o_prime = func_list[out_activation][1]
+        self.keep_hid = False
 
+    def keepHid(self, state):
+        self.keep_hid = state
         
     def forward(self, aux=False):
         T = self.X0.shape[0]
-        self.H = np.zeros((T+1, self.n_hid))
+        if self.keep_hid is True and self.H is not None:
+            h_temp = self.H[-1,::]
+            self.H = np.zeros((T+1, self.n_hid))
+            self.H[0, ::] = h_temp
+        else:
+            self.H = np.zeros((T+1, self.n_hid))
         self.Z_h = np.zeros((T, self.n_hid))
         self.Z_o = np.zeros((T, self.n_out))
         if aux is False:
@@ -334,6 +343,7 @@ class NetTrainer(object):
     print_interval = None
     train_data = None
     label_data = None
+    shuffle_data = None
 
     def __init__(self, params):
         for prm_name in params.keys():
@@ -345,7 +355,10 @@ class NetTrainer(object):
         self.loss = loss_list[self.loss_func][0]
         self.lossPrime = loss_list[self.loss_func][1]
         assert self.train_data is not None, "Training data must be specified"
-        self.data = Data(self.train_data, batch_size=self.batch_size)
+        if self.shuffle_data is not None:
+            self.data = Data(self.train_data, batch_size=self.batch_size, shuffle=self.shuffle_data)
+        else:
+            self.data = Data(self.train_data, batch_size=self.batch_size)
         assert self.label_data is not None, "Labels must be specified"        
         self.labels = Data(self.label_data)
         self.solver_func = self.solver.solver_func
