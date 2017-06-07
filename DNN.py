@@ -170,6 +170,7 @@ class RNNLayer(object):
     Z_h = None
     Z_o = None
     D0 = None
+    DH = None
     D1 = None
     params = None
     params_aux = None
@@ -194,7 +195,7 @@ class RNNLayer(object):
         self.grads = {}
         self.params['W_vh'] = np.random.normal(size=(self.n_in, self.n_hid)) / np.sqrt(self.n_in)
         self.params['b_h'] = np.zeros((1, self.n_hid))
-        self.params['W_hh'] = np.random.normal(size=(self.n_hid, self.n_hid)) / np.sqrt(self.n_hid)
+        self.params['W_hh'] = 0.1*np.random.normal(size=(self.n_hid, self.n_hid)) / np.sqrt(self.n_hid)
         self.params['b_o'] = np.zeros((1, self.n_out))
         self.params['W_ho'] = np.random.normal(size=(self.n_hid, self.n_out)) / np.sqrt(self.n_hid)
         for paramname in self.params.keys():
@@ -209,37 +210,55 @@ class RNNLayer(object):
         
     def forward(self, aux=False):
         T = self.X0.shape[0]
-        self.H = np.zeros((T+1, self.X0.shape[1], self.n_hid))
+        self.H = np.zeros((T+1, self.n_hid))
+        self.Z_h = np.zeros((T, self.n_hid))
+        self.Z_o = np.zeros((T, self.n_out))
         if aux is False:
             for iTm in range(T):
-                self.Z_h[iTm, :, :] = np.dot(self.X0[iTm, ::], self.params['W_vh']) + np.dot(self.H[iTm, ::], self.params['W_hh']) + self.params['b_h']
+                self.Z_h[iTm, ::] = np.dot(self.X0[iTm, ::], self.params['W_vh']) + np.dot(self.H[iTm, ::], self.params['W_hh']) + self.params['b_h']
                 self.H[iTm + 1, ::] = self.g_o(self.Z_h[iTm, ::])
                 self.Z_o[iTm, ::] = np.dot(self.H[iTm + 1, ::], self.params['W_ho']) + self.params['b_o']
         else:
             for iTm in range(T):
-                self.Z_h[iTm, :, :] = np.dot(self.X0[iTm, ::], self.params_aux['W_vh']) + np.dot(self.H[iTm, ::], self.params_aux['W_hh']) + self.params_aux['b_h']
+                self.Z_h[iTm, ::] = np.dot(self.X0[iTm, ::], self.params_aux['W_vh']) + np.dot(self.H[iTm, ::], self.params_aux['W_hh']) + self.params_aux['b_h']
                 self.H[iTm + 1, ::] = self.g_o(self.Z_h[iTm, ::])
                 self.Z_o[iTm, ::] = np.dot(self.H[iTm + 1, ::], self.params_aux['W_ho']) + self.params_aux['b_o']
                 
-        self.X1 = self.g(self.Z_o)
+        self.X1 = self.g_o(self.Z_o)
     
     def backward(self, aux=False):
+        self.DH = np.zeros_like(self.H)
+        self.D0 = np.zeros_like(self.X0)
         if self.D1 is None:
-            G = self.g_prime(self.Z)
+            G_o = self.g_o_prime(self.Z_o)
         else:
-            G = np.multiply(self.D1, self.g_prime(self.Z))
+            G_o = np.multiply(self.D1, self.g_o_prime(self.Z_o))
+
+        T = G_o.shape[0]
+        G_h = np.zeros_like(self.Z_h)
         if aux is False:
-            self.D0 = np.dot(self.G, self.params['W'].transpose())
+            for iTm in range(T-1, -1, -1):
+                G_h[iTm, ::] = np.multiply(self.DH[iTm+1, ::], self.g_h_prime(self.Z_h[iTm, ::]))
+                self.DH[iTm , ::] = np.dot(G_o[iTm, ::], self.params['W_ho'].transpose()) + np.dot(G_h[iTm, ::], self.params['W_hh'].transpose())
+                self.D0[iTm, ::] = np.dot(G_h[iTm, ::], self.params['W_vh'].transpose())
         else:
-            self.D0 = np.dot(self.G, self.params_aux['W'].transpose())
-        self.grads['W'] = np.dot(self.X0.transpose(), self.G)
-        self.grads['b'] = np.sum(self.G, axis=0)
+            for iTm in range(T-1, -1, -1):
+                G_h[iTm, ::] = np.multiply(self.DH[iTm+1, ::], self.g_h_prime(self.Z_h[iTm, ::]))
+                self.DH[iTm , ::] = np.dot(G_o[iTm, ::], self.params_aux['W_ho'].transpose()) + np.dot(G_h[iTm, ::], self.params_aux['W_hh'].transpose())
+                self.D0[iTm, ::] = np.dot(G_h[iTm, ::], self.params_aux['W_vh'].transpose())
+        self.grads['W_ho'] = np.dot(self.H[1:, ::].transpose(), G_o)
+        self.grads['b_o'] = np.sum(G_o, axis=0)
+        self.grads['W_hh'] = np.dot(self.H[:T, ::].transpose(), G_h)
+        self.grads['W_vh'] = np.dot(self.X0.transpose(), G_h)
+        self.grads['b_h'] = np.sum(G_h, axis=0)
             
     def updateParam(self, solver_func):
         solver_func(self)
-        self.params['W'] += self.deltas['W']
-        self.params['b'] += self.deltas['b']
-
+        self.params['W_ho'] += self.deltas['W_ho']
+        self.params['b_o'] += self.deltas['b_o']
+        self.params['W_hh'] += self.deltas['W_hh']
+        self.params['W_vh'] += self.deltas['W_vh']
+        self.params['b_h'] += self.deltas['b_h']
 
 
 class Net(object):
@@ -321,7 +340,6 @@ class NetTrainer(object):
             setattr(self, prm_name, params[prm_name])
         if self.max_iter is None:
             self.max_iter = 1000
-
         assert self.net is not None, "Net object cannot be None"
         assert self.loss_func is not None, "No loss was specified"
         self.loss = loss_list[self.loss_func][0]
