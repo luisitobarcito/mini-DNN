@@ -4,11 +4,12 @@ the basic elements of a deep neural network
 in action.
 """
 import numpy as np
-import matplotlib.pyplot as plt
+
 
 from pointwise_activations import func_list
 from loss_functions import loss_list
 from Solvers import *
+
 
 class Data(object):
     """
@@ -42,7 +43,7 @@ class Data(object):
             self.batch_size = batch_size
             self.batch_iter = 0
         self.n_batches = self.data_size / self.batch_size
-        leftovers = self.data_size % self.batch_size
+        self.leftovers = self.data_size % self.batch_size
                 
     def getBatch(self):
         if self.batch_iter is None:
@@ -275,7 +276,7 @@ class Net(object):
     Net is a container for all the Layer objects that form a network
 
     It manages the forward,backward passes through the networks as well
-    as the parametr update calls. Note that Net objects are independent of
+    as the parameter update calls. Note that Net objects are independent of
     the cost function employed for their training
     """
     
@@ -370,5 +371,4 @@ class NetTrainer(object):
             T = self.labels.getDataAsIn(self.data)
             objective = self.solver.step(self.net, Xin, T, self.loss_func)
             if iTr % self.print_interval == 0:
-                print "Iteration %d, objective = %f" % (iTr,objective)
-
+                print ("Iteration %d, objective = %f" % (iTr,objective))

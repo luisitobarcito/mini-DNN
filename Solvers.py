@@ -4,7 +4,6 @@ the basic elements of a deep neural network
 in action.
 """
 import numpy as np
-import matplotlib.pyplot as plt
 
 from pointwise_activations import func_list
 from loss_functions import loss_list
@@ -84,7 +83,7 @@ class RMSPropSolver(Solver):
         for prm_name in params.keys():
             setattr(self, prm_name, params[prm_name])
         if hasattr(self, 'momentum'):
-            print 'Ignoring momentum parameter for RMSPropSolver'
+            print ('Ignoring momentum parameter for RMSPropSolver')
         if self.rms_forget is None:
             self.rms_forget = 0.99
 
@@ -149,7 +148,7 @@ class AdaDeltaSolver(Solver):
         for prm_name in params.keys():
             setattr(self, prm_name, params[prm_name])
         if hasattr(self, 'lr_rate'):
-            print 'Ignoring learning rate for AdaDeltaSolver'
+            print ('Ignoring learning rate for AdaDeltaSolver')
         if self.rms_forget is None:
             self.rms_forget = 0.99
         if self.ada_eps is None:
